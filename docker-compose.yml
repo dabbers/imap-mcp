@@ -1,0 +1,59 @@
+services:
+  imap-mcp:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    mem_limit: 256m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    environment:
+      IMAP_HOST: ${IMAP_HOST:-imap.migadu.com}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER}
+      IMAP_PASS: ${IMAP_PASS}
+      MCP_PATH_SECRET: ${MCP_PATH_SECRET}
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      ALLOWED_CIDRS: ${ALLOWED_CIDRS:-160.79.104.0/21}
+      TOTP_SECRET: ${TOTP_SECRET}
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY}
+      ACCESS_TOKEN_DAYS: ${ACCESS_TOKEN_DAYS:-14}
+      TOKEN_EPOCH: ${TOKEN_EPOCH:-1}
+      ALLOWED_FOLDERS: ${ALLOWED_FOLDERS:-INBOX}
+      MAX_DAYS_BACK: ${MAX_DAYS_BACK:-90}
+      MAX_BODY_CHARS: ${MAX_BODY_CHARS:-20000}
+      MAX_MESSAGE_BYTES: ${MAX_MESSAGE_BYTES:-3145728}
+      STRIP_URLS: ${STRIP_URLS:-true}
+      RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-30}
+      MAX_CONCURRENT: ${MAX_CONCURRENT:-1}
+      CALLS_PER_MIN: ${CALLS_PER_MIN:-10}
+      SEARCHES_PER_HOUR: ${SEARCHES_PER_HOUR:-40}
+      BODIES_PER_HOUR: ${BODIES_PER_HOUR:-20}
+      BODIES_PER_DAY: ${BODIES_PER_DAY:-80}
+      DISTINCT_BODIES_PER_DAY: ${DISTINCT_BODIES_PER_DAY:-60}
+      MAX_SEARCH_LIMIT: ${MAX_SEARCH_LIMIT:-20}
+      TRIPWIRE_REJECTS: ${TRIPWIRE_REJECTS:-5}
+      SENSITIVE_THRESHOLD: ${SENSITIVE_THRESHOLD:-5}
+      SENSITIVE_SENDERS: ${SENSITIVE_SENDERS:-}
+    expose: ["3000"]   # never "ports:": the app trusts X-Forwarded-For from Traefik only
+    # Attach a domain to port 3000 in Dokploy's Domains tab (HTTPS on).
+    # Second IP-allowlist layer at the edge (Dokploy's Traefik picks these up):
+    labels:
+      - traefik.http.middlewares.mcp-anthropic.ipallowlist.sourcerange=160.79.104.0/21
+      # The TOTP page is opened from your own browser, so only MCP + token/register get the allowlist.
+      - traefik.http.routers.imap-mcp-api.rule=Host(`${PUBLIC_HOST}`) && (PathPrefix(`/mcp/`) || Path(`/oauth/token`) || Path(`/oauth/register`))
+      - traefik.http.routers.imap-mcp-api.entrypoints=websecure
+      - traefik.http.routers.imap-mcp-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.imap-mcp-api.middlewares=mcp-anthropic
+      - traefik.http.routers.imap-mcp-api.priority=100
+      - traefik.http.routers.imap-mcp-api.service=imap-mcp-svc
+      - traefik.http.services.imap-mcp-svc.loadbalancer.server.port=3000
+    networks: [dokploy-network]
+
+networks:
+  dokploy-network:
+    external: true
