@@ -35,7 +35,8 @@ const cfg = {
   signingKey: process.env.TOKEN_SIGNING_KEY || undefined,
   accessTokenDays: num("ACCESS_TOKEN_DAYS", 14),
   tokenEpoch: process.env.TOKEN_EPOCH ?? "1",
-  allowedFolders: (process.env.ALLOWED_FOLDERS ?? "INBOX")
+  // "*" allows every selectable folder on the account.
+  allowedFolders: (process.env.ALLOWED_FOLDERS ?? "*")
     .split(",").map((s) => s.trim()).filter(Boolean),
   maxDaysBack: num("MAX_DAYS_BACK", 90),
   maxBodyChars: num("MAX_BODY_CHARS", 20000),
@@ -108,8 +109,14 @@ function cutoff(): Date {
   return new Date(Date.now() - cfg.maxDaysBack * 86_400_000);
 }
 
+const allFolders = cfg.allowedFolders.includes("*");
+
+function folderAllowed(folder: string): boolean {
+  return allFolders || cfg.allowedFolders.includes(folder);
+}
+
 function assertFolder(folder: string) {
-  if (!cfg.allowedFolders.includes(folder)) {
+  if (!folderAllowed(folder)) {
     throw new Error(`Folder not allowed. Allowed: ${cfg.allowedFolders.join(", ")}`);
   }
 }
@@ -215,7 +222,7 @@ function buildServer(ctx: Ctx) {
         try {
           const all = await client.list();
           return all
-            .filter((f) => cfg.allowedFolders.includes(f.path))
+            .filter((f) => folderAllowed(f.path) && !f.flags?.has("\\Noselect"))
             .map((f) => ({ path: f.path, specialUse: f.specialUse ?? null }));
         } finally {
           await client.logout().catch(() => {});
