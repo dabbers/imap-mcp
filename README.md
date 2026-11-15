@@ -3,7 +3,7 @@
 Read-only IMAP MCP server (Streamable HTTP, stateless) for Claude custom connectors.
 
 ## Tools
-- `list_folders` — allowed folders only
+- `list_folders` — allowed folders only (`ALLOWED_FOLDERS`: comma-separated paths, or `*` for all; default `*`)
 - `search_messages` — envelope metadata, newest first, filtered by from/to/subject/date, clamped to `MAX_DAYS_BACK`. **No body text search** (it would be a code-guessing oracle).
 - `get_message` — plain-text body (HTML flattened, links/images stripped, length-capped), attachment list only
 
